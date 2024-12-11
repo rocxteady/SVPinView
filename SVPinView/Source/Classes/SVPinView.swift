@@ -42,7 +42,10 @@ public class SVPinView: UIView {
     @IBOutlet fileprivate var errorView: UIView!
     
     fileprivate var flowLayout: UICollectionViewFlowLayout {
-        self.collectionView.collectionViewLayout = SVPinViewFlowLayout()
+        let layout = SVPinViewFlowLayout()
+        layout.minimumInteritemSpacing = interSpace
+        layout.minimumLineSpacing = 0
+        self.collectionView.collectionViewLayout = layout
         return self.collectionView?.collectionViewLayout as! UICollectionViewFlowLayout
     }
     
@@ -376,8 +379,9 @@ extension SVPinView : UICollectionViewDataSource, UICollectionViewDelegate, UICo
             return CGSize(width: width, height: collectionView.frame.height)
         }
         let width = (collectionView.bounds.width - (interSpace * CGFloat(max(pinLength, 1) - 1)))/CGFloat(pinLength)
+        let roundedWidth = width.rounded(.down)
         let height = collectionView.frame.height
-        return CGSize(width: min(width, height), height: min(width, height))
+        return CGSize(width: min(roundedWidth, height), height: min(roundedWidth, height))
     }
     
     public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
