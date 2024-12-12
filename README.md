@@ -1,9 +1,7 @@
 # SVPinView
 SVPinView is a light-weight customisable library used for accepting pin numbers or one-time passwords.
 
-[![Swift 5.1](https://img.shields.io/badge/Swift-5.1-orange.svg?style=flat)](https://developer.apple.com/swift/)
-[![CocoaPods Compatible](https://img.shields.io/cocoapods/v/SVPinView.svg)](https://developer.apple.com/swift/)
-[![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage)
+[![Swift 5.10](https://img.shields.io/badge/Swift-5.1-orange.svg?style=flat)](https://developer.apple.com/swift/)
 [![Platforms iOS](https://img.shields.io/badge/Platforms-iOS-lightgray.svg?style=flat)](http://www.apple.com/ios/)
 [![License MIT](https://img.shields.io/badge/License-MIT-lightgrey.svg?style=flat)](https://opensource.org/licenses/MIT)
 
@@ -16,35 +14,19 @@ An [example project](https://github.com/xornorik/SVPinView/blob/master/SVPinView
 
 ## Installation
 
-### CocoaPods
+### Swift Package Manager
 
-Add the following line to your Podfile:
+Add the following as a dependency to your `Package.swift`:
 
-```ruby
-pod 'SVPinView', '~> 1.0'
+```swift
+.package(url: "https://github.com/rocxteady/SVPinView.git", .upToNextMajor(from: "2.0.0"))
 ```
 
-Then run the following in the same directory as your Podfile:
-```ruby
-pod install
+Then add `SVPinView` as a dependency of your target:
+
+```swift
+.target(name: "BestExampleApp", dependencies: ["SVPinView"]),
 ```
-
-### Carthage
-
-```ruby
-github xornorik/SVPinView
-```
-
-- Create a Cartfile file at the root of your project folder
-- Add github `xornorik/SVPinView` to your Cartfile
-- Run carthage update
-- Drag and drop SVPinView.framework from /Carthage/Build/iOS/ to Linked frameworks and libraries in Xcode (Project>Target>General>Linked frameworks and libraries)
-- Add new run script (Project>Target>Build Phases>+> New run script phase) /usr/local/bin/carthage copy-frameworks
-- Add Input files $(SRCROOT)/Carthage/Build/iOS/SVPinView.framework
-
-### Manual
-
-Clone the repo and drag files from `SVPinView/Source` folder into your Xcode project.
 
 ## Usage
 
@@ -130,8 +112,8 @@ pinView.didChangeCallback = { [weak self] pin in
 
 ## Requirements
 
-- iOS 9.0 +
-- Xcode 8.0 +
+- iOS 12.0 +
+- Xcode 10.0 +
 
 ## License
 
