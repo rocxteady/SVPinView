@@ -39,7 +39,6 @@ public class SVPinView: UIView {
     
     // MARK: - Private Properties -
     @IBOutlet fileprivate var collectionView: UICollectionView!
-    @IBOutlet fileprivate var errorView: UIView!
     
     fileprivate var flowLayout: UICollectionViewFlowLayout {
         let layout = SVPinViewFlowLayout()
@@ -66,7 +65,8 @@ public class SVPinView: UIView {
     
     @IBInspectable public var borderLineColor: UIColor = UIColor.black
     @IBInspectable public var activeBorderLineColor: UIColor = UIColor.black
-    
+    @IBInspectable public var errorBorderLineColor: UIColor = UIColor.red
+
     @IBInspectable public var borderLineThickness: CGFloat = 2
     @IBInspectable public var activeBorderLineThickness: CGFloat = 4
     
@@ -89,8 +89,14 @@ public class SVPinView: UIView {
         didSet { refreshPinView() }
     }
     
+    public var isError: Bool = false {
+        didSet {
+            reloadStyles()
+        }
+    }
     public var didFinishCallback: ((String)->())?
     public var didChangeCallback: ((String)->())?
+    public var didReceiveError: ((Error)->())?
     
     // MARK: - Init methods -
     required public init?(coder aDecoder: NSCoder) {
@@ -127,8 +133,9 @@ public class SVPinView: UIView {
     @objc fileprivate func textFieldDidChange(_ textField: UITextField) {
         var nextTag = textField.tag
         let index = nextTag - 100
-        guard let placeholderLabel = textField.superview?.viewWithTag(400) as? UILabel else {
-            showPinError(error: "ERR-101: Type Mismatch")
+        guard let cell = collectionView.cellForItem(at: IndexPath(item: index - 1, section: 0)) as? SVPinCell,
+              let placeholderLabel = cell.placeholderLabel else {
+            showPinError(error: "ERR-100: Type Mismatch")
             return
         }
         
@@ -152,14 +159,12 @@ public class SVPinView: UIView {
         
         // if entered text is a backspace - do nothing; else - move to next field
         // backspace logic handled in SVPinField
-        nextTag = isBackSpace() ? textField.tag : textField.tag + 1
+        let nextIndex = isBackSpace() ? index - 1 : index
         
-        // Try to find next responder
-        if let nextResponder = textField.superview?.superview?.superview?.superview?.viewWithTag(nextTag) as UIResponder? {
-            // Found next responder, so set it.
-            nextResponder.becomeFirstResponder()
+        if let cell = collectionView.cellForItem(at: .init(item: nextIndex, section: 0)) as? SVPinCell,
+           let nextTextField = cell.pinField {
+            nextTextField.becomeFirstResponder()
         } else {
-            // Not found, so dismiss keyboard
             if index == 1 && shouldDismissKeyboardOnEmptyFirstField {
                 textField.resignFirstResponder()
             } else if index > 1 { textField.resignFirstResponder() }
@@ -200,7 +205,7 @@ public class SVPinView: UIView {
         for (index, char) in placeholder.enumerated() {
             guard index < pinLength else { return }
             
-            if let placeholderLabel = collectionView.cellForItem(at: IndexPath(item: index, section: 0))?.viewWithTag(400) as? UILabel {
+            if let placeholderLabel = (collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? SVPinCell)?.placeholderLabel {
                 placeholderLabel.text = String(char)
             } else { showPinError(error: "ERR-102: Type Mismatch") }
         }
@@ -229,7 +234,11 @@ public class SVPinView: UIView {
         case .box:
             setupUnderline(color: UIColor.clear, withThickness: 0)
             containerView.layer.borderWidth = isActive ? activeBorderLineThickness : borderLineThickness
-            containerView.layer.borderColor = isActive ? activeBorderLineColor.cgColor : borderLineColor.cgColor
+            if isError {
+                containerView.layer.borderColor = isActive ? activeBorderLineColor.cgColor : borderLineColor.cgColor
+            } else {
+                containerView.layer.borderColor = isActive ? activeBorderLineColor.cgColor : borderLineColor.cgColor
+            }
         }
      }
     
@@ -237,12 +246,11 @@ public class SVPinView: UIView {
         view.removeFromSuperview()
         view = nil
         isLoading = true
-        errorView.isHidden = true
         loadView(completionHandler: completionHandler)
     }
     
     fileprivate func showPinError(error: String) {
-        errorView.isHidden = false
+        didReceiveError?(NSError(domain: "SVPinView", code: 0, userInfo: [NSLocalizedDescriptionKey: error]))
         print("\n----------SVPinView Error----------")
         print(error)
         print("-----------------------------------")
@@ -292,9 +300,9 @@ public class SVPinView: UIView {
             guard index < pinLength else { return }
 
             // Get the first textField
-            guard let textField = collectionView.cellForItem(at: IndexPath(item: index, section: 0))?.viewWithTag(101 + index) as? SVPinField,
-                let placeholderLabel = collectionView.cellForItem(at: IndexPath(item: index, section: 0))?.viewWithTag(400) as? UILabel
-            else {
+            guard let cell = (collectionView.cellForItem(at: IndexPath(item: index, section: 0)) as? SVPinCell),
+                  let textField = cell.pinField,
+                  let placeholderLabel = cell.placeholderLabel else {
                 showPinError(error: "ERR-103: Type Mismatch")
                 return
             }
@@ -314,6 +322,14 @@ public class SVPinView: UIView {
             validateAndSendCallback()
         }
     }
+    
+    @objc
+    public func reloadStyles() {
+        for i in 0..<pinLength {
+            guard let cell = collectionView.cellForItem(at: IndexPath(item: i, section: 0)) as? SVPinCell else { continue }
+            stylePinField(containerView: cell.containverView, underLine: cell.underlineView, isActive: cell.pinField.isFirstResponder)
+        }
+    }
 }
 
 // MARK: - CollectionView methods -
@@ -325,11 +341,12 @@ extension SVPinView : UICollectionViewDataSource, UICollectionViewDelegate, UICo
     
     public func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: reuseIdentifier, for: indexPath)
+        guard let pinCell = cell as? SVPinCell else { return cell }
         
-        guard let textField = cell.viewWithTag(100) as? SVPinField,
-            let containerView = cell.viewWithTag(51),
-            let underLine = cell.viewWithTag(50),
-            let placeholderLabel = cell.viewWithTag(400) as? UILabel
+        guard let textField = pinCell.pinField,
+              let containerView = pinCell.containverView,
+              let underLine = pinCell.underlineView,
+              let placeholderLabel = pinCell.placeholderLabel
         else {
             showPinError(error: "ERR-104: Tag Mismatch")
             return UICollectionViewCell()
@@ -414,8 +431,10 @@ extension SVPinView : UICollectionViewDataSource, UICollectionViewDelegate, UICo
 extension SVPinView : UITextFieldDelegate
 {
     public func textFieldDidBeginEditing(_ textField: UITextField) {
+        let passwordIndex = (textField.tag - 100) - 1
+        guard let cell = collectionView.cellForItem(at: .init(item: passwordIndex, section: 0)) as? SVPinCell else { return }
         let text = textField.text ?? ""
-        if let placeholderLabel = textField.superview?.viewWithTag(400) as? UILabel {
+        if  let placeholderLabel = cell.placeholderLabel {
             placeholderLabel.isHidden = true
             
             if text.count == 0 {
@@ -423,7 +442,6 @@ extension SVPinView : UITextFieldDelegate
                 placeholderLabel.isHidden = false
             } else if deleteButtonAction == .moveToPreviousAndDelete {
                 textField.text = ""
-                let passwordIndex = (textField.tag - 100) - 1
                 if password.count > (passwordIndex) {
                     password[passwordIndex] = ""
                     textField.isSecureTextEntry = false
@@ -432,15 +450,18 @@ extension SVPinView : UITextFieldDelegate
             }
         } else { showPinError(error: "ERR-105: Type Mismatch") }
         
-        if let containerView = textField.superview?.viewWithTag(51),
-        let underLine = textField.superview?.viewWithTag(50) {
+        if let containerView = cell.containverView,
+           let underLine = cell.underlineView {
             self.stylePinField(containerView: containerView, underLine: underLine, isActive: true)
         } else { showPinError(error: "ERR-106: Type Mismatch") }
     }
     
     public func textFieldDidEndEditing(_ textField: UITextField) {
-        if let containerView = textField.superview?.viewWithTag(51),
-        let underLine = textField.superview?.viewWithTag(50) {
+        let passwordIndex = (textField.tag - 100) - 1
+        guard let cell = collectionView.cellForItem(at: .init(item: passwordIndex, section: 0)) as? SVPinCell else { return }
+
+        if let containerView = cell.containverView,
+           let underLine = cell.underlineView {
             self.stylePinField(containerView: containerView, underLine: underLine, isActive: false)
         } else { showPinError(error: "ERR-107: Type Mismatch") }
     }
